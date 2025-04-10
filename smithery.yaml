@@ -1,0 +1,14 @@
+version: 1
+build:
+  dockerfile: Dockerfile
+  context: .
+server:
+  type: json-rpc
+  port: 3000
+  health_check:
+    path: /health
+    interval: 10s
+    timeout: 5s
+    retries: 3
+  mcp:
+    file: cats_mcp.json

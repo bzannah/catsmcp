@@ -54,73 +54,119 @@ rl.on('line', async (line) => {
       
       // Handle tools/list method to return available tools
       if (method === 'tools/list') {
+        // Format tools according to MCP specification
+        const toolsList = Object.entries(mcpConfig.tools).map(([name, definition]) => {
+          return {
+            name,
+            description: definition.description,
+            parameters: definition.parameters,
+            returns: definition.returns,
+            examples: definition.examples || []
+          };
+        });
+        
+        log(`Returning tools list with ${toolsList.length} tools`);
+        
         response = {
           jsonrpc: '2.0',
           result: {
-            tools: Object.keys(mcpConfig.tools).map(toolName => ({
-              name: toolName,
-              description: mcpConfig.tools[toolName].description,
-              parameters: mcpConfig.tools[toolName].parameters,
-              returns: mcpConfig.tools[toolName].returns
-            }))
+            tools: toolsList
           },
           id
         };
       }
-      // Handle get_random_cat method
-      else if (method === 'get_random_cat') {
-        try {
-          const endpoint = `${baseUrl}${mcpConfig.api.endpoints.get_random_cat.path}`;
-          log(`Fetching from endpoint: ${endpoint}`);
-          const apiResponse = await axios.get(endpoint);
-          
-          response = {
-            jsonrpc: '2.0',
-            result: apiResponse.data,
-            id
-          };
-        } catch (error) {
-          log(`Error fetching random cat: ${error.message}`);
-          response = {
-            jsonrpc: '2.0',
-            error: {
-              code: INTERNAL_ERROR.code,
-              message: `Error fetching random cat: ${error.message}`
-            },
-            id
-          };
-        }
-      }
-      // Handle get_cats method
-      else if (method === 'get_cats') {
-        // Validate parameters
-        if (!params || typeof params.n !== 'number' || params.n < 1) {
+      // Handle tools/call method for invoking tools
+      else if (method === 'tools/call') {
+        if (!params || !params.name) {
           response = {
             jsonrpc: '2.0',
             error: INVALID_PARAMS,
             id
           };
+          log('Invalid tool call: missing tool name');
         } else {
-          try {
-            const endpoint = `${baseUrl}${mcpConfig.api.endpoints.get_cats.path}?n=${params.n}`;
-            log(`Fetching from endpoint: ${endpoint}`);
-            const apiResponse = await axios.get(endpoint);
-            
+          const toolName = params.name;
+          const toolParams = params.parameters || {};
+          
+          log(`Tool call: ${toolName} with params: ${JSON.stringify(toolParams)}`);
+          
+          // Handle get_random_cat tool
+          if (toolName === 'get_random_cat') {
+            try {
+              const endpoint = `${baseUrl}${mcpConfig.api.endpoints.get_random_cat.path}`;
+              log(`Fetching from endpoint: ${endpoint}`);
+              const apiResponse = await axios.get(endpoint);
+              
+              response = {
+                jsonrpc: '2.0',
+                result: {
+                  content: apiResponse.data,
+                  isError: false
+                },
+                id
+              };
+            } catch (error) {
+              log(`Error fetching random cat: ${error.message}`);
+              response = {
+                jsonrpc: '2.0',
+                result: {
+                  content: { error: `Error fetching random cat: ${error.message}` },
+                  isError: true
+                },
+                id
+              };
+            }
+          }
+          // Handle get_cats tool
+          else if (toolName === 'get_cats') {
+            // Validate parameters
+            if (toolParams.n !== undefined && (typeof toolParams.n !== 'number' || toolParams.n < 1)) {
+              response = {
+                jsonrpc: '2.0',
+                result: {
+                  content: { error: 'Invalid parameter: n must be a positive integer' },
+                  isError: true
+                },
+                id
+              };
+            } else {
+              try {
+                const n = toolParams.n || 5; // Default to 5 if not specified
+                const endpoint = `${baseUrl}${mcpConfig.api.endpoints.get_cats.path}?n=${n}`;
+                log(`Fetching from endpoint: ${endpoint}`);
+                const apiResponse = await axios.get(endpoint);
+                
+                response = {
+                  jsonrpc: '2.0',
+                  result: {
+                    content: apiResponse.data,
+                    isError: false
+                  },
+                  id
+                };
+              } catch (error) {
+                log(`Error fetching cats: ${error.message}`);
+                response = {
+                  jsonrpc: '2.0',
+                  result: {
+                    content: { error: `Error fetching cats: ${error.message}` },
+                    isError: true
+                  },
+                  id
+                };
+              }
+            }
+          } else {
+            // Tool not found
             response = {
               jsonrpc: '2.0',
-              result: apiResponse.data,
-              id
-            };
-          } catch (error) {
-            log(`Error fetching cats: ${error.message}`);
-            response = {
-              jsonrpc: '2.0',
-              error: {
-                code: INTERNAL_ERROR.code,
-                message: `Error fetching cats: ${error.message}`
+              result: {
+                content: { error: `Tool not found: ${toolName}` },
+                isError: true
               },
               id
             };
+            log(`Tool not found: ${toolName}`);
           }
         }
       }
@@ -131,6 +177,7 @@ rl.on('line', async (line) => {
           error: METHOD_NOT_FOUND,
           id
         };
+        log(`Method not found: ${method}`);
       }
     }
   } catch (error) {
@@ -143,6 +190,7 @@ rl.on('line', async (line) => {
   }
   
   // Send the response
+  log(`Sending response: ${JSON.stringify(response)}`);
   console.log(JSON.stringify(response));
 });
 

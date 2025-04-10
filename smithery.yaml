@@ -3,15 +3,18 @@ startCommand:
   type: stdio
   configSchema:
     # JSON Schema defining the configuration options for the MCP.
-    {}
+    type: object
+    properties: {}
+    required: []
   commandFunction: |-
     (config) => ({
       "command": "node",
       "args": [
-        "server.js"
+        "stdio_server.js"
       ],
       "env": {
-        "PORT": "3000"
+        "PORT": "3000",
+        "NODE_ENV": "production"
       }
     })
 

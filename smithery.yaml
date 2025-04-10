@@ -1,14 +1,20 @@
-version: 1
+# Smithery.ai configuration
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    {}
+  commandFunction: |-
+    (config) => ({
+      "command": "node",
+      "args": [
+        "server.js"
+      ],
+      "env": {
+        "PORT": "3000"
+      }
+    })
+
 build:
   dockerfile: Dockerfile
   context: .
-server:
-  type: json-rpc
-  port: 3000
-  health_check:
-    path: /health
-    interval: 10s
-    timeout: 5s
-    retries: 3
-  mcp:
-    file: cats_mcp.json
